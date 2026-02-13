@@ -1,4 +1,3 @@
-
 import streamlit as st
 import gspread
 import pandas as pd
@@ -89,8 +88,8 @@ with st.sidebar:
         st.rerun()
 
 # Tabs
-tab_overview, tab_transactions, tab_visuals, tab_transport, tab_salary, tab_other_income, tab_balance, tab_scheduled, tab_yearly, tab_export = st.tabs([
-    "📊 Overview", "📋 Transactions", "📈 Visuals", "🚗 Transport",
+tab_averview, tab_transactions, tab_visuals, tab_transport, tab_salary, tab_other_income, tab_balance, tab_scheduled, tab_yearly, tab_export = st.tabs([
+    "📊 Averview", "📋 Transactions", "📈 Visuals", "🚗 Transport",
     "💰 Salary Income", "🎁 Other Income", "💸 Monthly Balance",
     "🗓️ Scheduled Expenses", "📅 Yearly Summary", "📤 Export"
 ])
@@ -98,8 +97,8 @@ tab_overview, tab_transactions, tab_visuals, tab_transport, tab_salary, tab_othe
 def color_impulse(val):
     return 'background-color: orange' if val in ["impulse", "son impulse", "foolish commitments"] else ''
 
-# Overview
-with tab_overview:
+# Averview
+with tab_averview:
     st.subheader(f"This Month ({current_month_str})")
     inc = this_month_inc["Amount"].sum() if not this_month_inc.empty else 0
     exp = this_month_exp["Amount"].sum() if not this_month_exp.empty else 0
