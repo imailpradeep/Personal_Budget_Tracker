@@ -12,7 +12,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-MASTER_SHEET_URL = "https://docs.google.com/spreadsheets/d/YOUR_MASTER_SHEET_ID/edit"  # ← CHANGE THIS
+MASTER_SHEET_URL = "https://docs.google.com/spreadsheets/d/1xzjGgtAMQsWEQ2qIiOfNNX9nhamwOE7twnpErrbfGw8/edit?usp=sharing"  # ← CHANGE THIS
 
 # Load service account
 creds = Credentials.from_service_account_file("service_account.json", scopes=SCOPES)
