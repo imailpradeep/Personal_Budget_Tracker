@@ -4,3 +4,4 @@ streamlit
 pandas
 python-dateutil
 openpyxl
+gspread
