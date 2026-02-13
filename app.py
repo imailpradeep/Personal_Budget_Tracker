@@ -1,111 +1,92 @@
 
 import streamlit as st
+import gspread
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
-import os
-import io
-from dateutil.relativedelta import relativedelta
+from google.oauth2.service_account import Credentials
+import json
 
-# LOCAL FILES (saved in the same folder where you run the app)
-CSV_FILE = "family_expenses.csv"
-BUDGET_FILE = "monthly_budgets.csv"
-SCHEDULED_FILE = "scheduled_expenses.csv"
-
-PASSWORD = "family2026"   # ← CHANGE THIS TO YOUR PASSWORD
-
-EXPENSE_CATEGORIES = [
-    "impulse", "take-out", "groceries", "home needs", "Son needs",
-    "son impulse", "charity", "loan emi", "LIC", "investment",
-    "foolish commitments", "transport"
+# ====================== CONFIG ======================
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
 ]
-INCOME_CATEGORIES = ["Salary Income", "Other Income"]
 
-# Robust load
-def load_data(file, columns):
-    if os.path.exists(file):
-        df = pd.read_csv(file)
-        if "Date" in df.columns and not df.empty:
-            df["Date"] = pd.to_datetime(df["Date"], errors="coerce", format='mixed')
-            df = df.dropna(subset=["Date"])
-        return df.sort_values("Date", ascending=False).reset_index(drop=True) if not df.empty else pd.DataFrame(columns=columns)
-    else:
-        df = pd.DataFrame(columns=columns)
-        df.to_csv(file, index=False)
-        return df
+MASTER_SHEET_URL = "https://docs.google.com/spreadsheets/d/YOUR_MASTER_SHEET_ID/edit"  # ← CHANGE THIS
 
-def load_budgets():
-    if os.path.exists(BUDGET_FILE):
-        return pd.read_csv(BUDGET_FILE).set_index("Category")["Budget"].to_dict()
-    else:
-        df = pd.DataFrame({"Category": EXPENSE_CATEGORIES, "Budget": 0.0})
-        df.to_csv(BUDGET_FILE, index=False)
-        return {cat: 0.0 for cat in EXPENSE_CATEGORIES}
+# Load service account
+creds = Credentials.from_service_account_file("service_account.json", scopes=SCOPES)
+gc = gspread.authorize(creds)
 
-# Load data
-expenses = load_data(CSV_FILE, ["Date", "Amount", "Category", "Description", "Type"])
-budgets = load_budgets()
-scheduled = load_data(SCHEDULED_FILE, ["Date", "Amount", "Category", "Description", "Recurring", "Frequency"])
+# Load master users
+master_sheet = gc.open_by_url(MASTER_SHEET_URL)
+users_df = master_sheet.worksheet("Sheet1").get_all_records()
+users_df = pd.DataFrame(users_df)
 
-# Authentication
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
+# ====================== AUTH ======================
+if "user" not in st.session_state:
+    st.session_state.user = None
 
-if not st.session_state.authenticated:
-    st.title("🔒 Family Finance Tracker")
-    pwd = st.text_input("Enter Password", type="password")
+if st.session_state.user is None:
+    st.title("🔐 Family Finance Tracker - Login")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+    
     if st.button("Login"):
-        if pwd == PASSWORD:
-            st.session_state.authenticated = True
+        match = users_df[(users_df["username"] == username) & (users_df["password"] == password)]
+        if not match.empty:
+            st.session_state.user = match.iloc[0]
+            st.success(f"Welcome {username}!")
             st.rerun()
         else:
-            st.error("Incorrect password")
+            st.error("Wrong username or password")
     st.stop()
 
-# App
-st.set_page_config(page_title="Family Finance Tracker", layout="wide")
-st.title("🧾 Family Finance Tracker")
+# ====================== USER'S SHEET ======================
+user = st.session_state.user
+user_sheet = gc.open_by_url(user["sheet_url"])
+st.title(f"🧾 {user['username'].title()}'s Finance Tracker")
 
-current_month_str = datetime.now().strftime("%Y-%m")
+# Create worksheets if not exist
+try:
+    expenses_ws = user_sheet.worksheet("Expenses")
+except:
+    expenses_ws = user_sheet.add_worksheet("Expenses", 1000, 10)
+    expenses_ws.append_row(["Date", "Amount", "Category", "Description", "Type"])
 
-# Safe filtering
-if not expenses.empty and "Date" in expenses.columns and pd.api.types.is_datetime64_any_dtype(expenses["Date"]):
-    current_month_df = expenses[expenses["Date"].dt.strftime("%Y-%m") == current_month_str]
-else:
-    current_month_df = expenses.copy()
+try:
+    budgets_ws = user_sheet.worksheet("Budgets")
+except:
+    budgets_ws = user_sheet.add_worksheet("Budgets", 50, 2)
+    budgets_ws.append_row(["Category", "Budget"])
 
-this_month_exp = current_month_df[current_month_df.get("Type") == "Expense"] if not current_month_df.empty else pd.DataFrame()
-this_month_inc = current_month_df[current_month_df.get("Type") == "Income"] if not current_month_df.empty else pd.DataFrame()
+# Load data
+expenses = pd.DataFrame(expenses_ws.get_all_records())
+budgets = pd.DataFrame(budgets_ws.get_all_records())
 
-# Sidebar
+# ====================== SIDEBAR ======================
 with st.sidebar:
-    st.header("Add New Entry")
-    entry_type = st.radio("Type", ["Expense", "Income"], horizontal=True)
-    date = st.date_input("Date", value=datetime.now())
-    amount = st.number_input("Amount (₹)", min_value=0.0, step=10.0, format="%.0f")
+    st.header("Add Entry")
+    entry_type = st.radio("Type", ["Expense", "Income"])
+    date = st.date_input("Date", datetime.now())
+    amount = st.number_input("Amount (₹)", min_value=0.0, step=10.0)
+    
     if entry_type == "Expense":
-        category = st.selectbox("Category", EXPENSE_CATEGORIES)
+        cat = st.selectbox("Category", [
+            "impulse", "take-out", "groceries", "home needs", "Son needs",
+            "son impulse", "charity", "loan emi", "LIC", "investment",
+            "foolish commitments", "transport"
+        ])
     else:
-        category = st.selectbox("Income Source", INCOME_CATEGORIES)
-    description = st.text_input("Description / Notes (optional)")
-    if st.button("➕ Add", type="primary") and amount > 0:
-        new_row = pd.DataFrame([{
-            "Date": pd.Timestamp(date), "Amount": amount, "Category": category,
-            "Description": description.strip(), "Type": entry_type
-        }])
-        expenses = pd.concat([expenses, new_row], ignore_index=True)
-        expenses.to_csv(CSV_FILE, index=False)
-        st.success(f"Added ₹{amount:,.0f} → {category}")
+        cat = st.selectbox("Income Source", ["Salary Income", "Other Income"])
+    
+    desc = st.text_input("Description")
+    
+    if st.button("➕ Add"):
+        expenses_ws.append_row([str(date), amount, cat, desc, entry_type])
+        st.success("Added!")
         st.rerun()
-
-    st.markdown("---")
-    st.header("Monthly Budgets")
-    for cat in EXPENSE_CATEGORIES:
-        current = budgets.get(cat, 0.0)
-        new_b = st.number_input(f"{cat}", value=float(current), step=500.0, key=f"b_{cat}")
-        if new_b != current:
-            budgets[cat] = new_b
-            pd.DataFrame({"Category": list(budgets.keys()), "Budget": list(budgets.values())}).to_csv(BUDGET_FILE, index=False)
 
 # Tabs
 tab_overview, tab_transactions, tab_visuals, tab_transport, tab_salary, tab_other_income, tab_balance, tab_scheduled, tab_yearly, tab_export = st.tabs([
