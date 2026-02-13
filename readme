@@ -2,3 +2,13 @@ https://family-finance-tracker.streamlit.app/
 https://personal-financial-tracker.streamlit.app/
 https://personal-financial-tracker.streamlit.app/
 https://docs.google.com/spreadsheets/d/1xzjGgtAMQsWEQ2qIiOfNNX9nhamwOE7twnpErrbfGw8/edit?usp=sharing
+Line 4 is the master sheet
+
+Create one Sheet per user
+For each user (you, wife, etc.):
+  Create a new blank Google Sheet in their Gmail
+  Name it whatever (e.g. "Pradeep Finance")
+  Share it with the service account email as Editor 
+  (service account email: personal-finance-tracker@valid-reflector-362411.iam.gserviceaccount.com)
+  Copy the Sheet URL and put it in the master sheet
+link for service.json: https://drive.google.com/file/d/1J4NhAcYp6zy3vfC2EAlMkYHKH3WiPs6u/view?usp=drive_link
