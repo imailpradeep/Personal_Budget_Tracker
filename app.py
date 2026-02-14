@@ -20,7 +20,7 @@ gc = gspread.authorize(creds)
 
 # Load master users
 master_sheet = gc.open_by_url(MASTER_SHEET_URL)
-users_df = master_sheet.worksheet("Sheet1").get_all_records()
+users_df = master_sheet.worksheet("https://docs.google.com/spreadsheets/d/1xzjGgtAMQsWEQ2qIiOfNNX9nhamwOE7twnpErrbfGw8/edit?usp=sharing").get_all_records()
 users_df = pd.DataFrame(users_df)
 
 # ====================== AUTH ======================
